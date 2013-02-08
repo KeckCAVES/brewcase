@@ -1,0 +1,21 @@
+# Name of software set; used as a directory name under /opt
+name="keckcaves"
+
+# Description of software set
+desc="KeckCAVES 3D Visualization Software"
+
+# URL for more info about the software
+url="http://keckcaves.org/software"
+
+# URL for users to rsync from for installation and updates
+rsyncsrc=keckcaves.org::macosx$macosxver
+
+# Taps needed to build
+taps=(KeckCAVES/vrui)
+
+# The formulae to build
+formulae=(crusta lidarviewer nck visualizer vrui-examples)
+
+# The files required in the rsync module
+# Additional files will be pulled in as required by the ones listed here.
+pkgfiles=(bin/crusta* bin/LidarViewer bin/NanotechConstructionKit bin/3DVisualizer bin/ShowEarthModel)

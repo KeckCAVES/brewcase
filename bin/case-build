@@ -1,0 +1,93 @@
+#!/bin/bash -e
+source "$(dirname "$0")"/../lib/init
+
+check_init
+
+[[ -x "$bindir/git" ]] || { tell "Still need git; installing..."; brew install git; }
+
+tell "Tapping..."
+tapswant=$(for x in "${taps[@]}"; do echo $x; done)
+tapshave=$(brew tap)
+[[ -n "$tapshave" ]] && echo "$tapshave" | while read t; do
+  echo "$tapswant" | grep -m 1 -i ^$t\$ >&/dev/null || brew untap $t
+done
+[[ -n "$tapswant" ]] && echo "$tapswant" | while read t; do
+  echo "$tapshave" | grep -m 1 -i ^$t\$ >&/dev/null || brew tap $t
+done
+brew tap --repair
+
+tell "Updating..."
+brew update
+
+tell "Uninstalling unneeded formula..."
+allreqs=$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
+brew ls | while read f; do
+  echo "$allreqs" | grep -m 1 "^\(.*/\)\?$f"\$ >&/dev/null || brew remove --force $f
+done
+
+tell "Upgrading..."
+brew upgrade
+
+tell "Installing..."
+allreqs=(); while read x; do allreqs+=($x); done <<<$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
+for f in ${allreqs[@]}; do
+  brew ls | grep -m 1 ^${f##*/}\$ >&/dev/null || brew install --fresh $f
+done
+
+tell "Cleaning up..."
+brew cleanup
+
+tell "Generating update command..."
+update="$bindir/$name-update"
+mkscript update >"$update"
+chmod +x "$update"
+
+tell "Generating manifest..."
+tell "  Get dependencies of"
+manifest=()
+while read x; do [[ -n "$x" ]] && manifest+=("$x"); done<<<"$(
+  cd "$installdir"
+  for x in ${pkgfiles[@]}; do
+    if [[ -e "$installdir/$x" ]]; then
+      tell "    $x"
+      (cd "$(dirname "$x")" && echo "$PWD/$(basename "$x")")
+    else
+      tell "    $x [Not found]"
+    fi
+    done | sort -u
+  echo "$update"
+)"
+spinstart "  Scanning..."
+for ((n=0; n<${#manifest[@]}; ++n)); do
+  while read x; do
+    [[ -n "$x" ]] && { for g in "${manifest[@]}"; do [[ "$x" == "$g" ]] && break; done || manifest+=("$x"); }
+  done<<<"$(
+    f=${manifest[n]}
+    if [[ -L "$f" ]]; then
+      l=$(readlink "$f"); (cd "$(dirname "$f")" && cd "$(dirname "$l")" && echo "$PWD/$(basename "$l")")
+    elif [[ -d "$f" ]]; then
+      [[ ! "$f" =~ /$ ]] || for g in "$f"*; do [[ -e "$g" ]] && echo -n "$g"; [[ -d "$g" ]] && echo / || echo; done
+    else
+      otool -L "$f" | tail -n +2 | grep -o "$installdir"'/[^( ]*'
+      strings - "$f" | grep -o "$installdir"'/[^ ]*' | while read g; do
+        while ! [[ -e "$g" ]]; do g=$(dirname "$g"); done; echo -n "$g"; [[ -d "$g" ]] && echo / || echo
+      done
+    fi | while read f; do
+      h=$f; t=${h##*[^/]}; while [[ ! -L "$h" && "$h" =~ ^"$installdir"/ ]]; do t=/$(basename "$h")"$t"; h=$(dirname "$h"); done
+      if [[ "$f" != "$h" && -L "$h" ]]; then
+        echo "$h"
+        l=$(readlink "$h"); (cd "$(dirname "$h")" && cd "$(dirname "$l")" && echo "$PWD/$(basename "$l")$t")
+      else
+        echo "$f"
+      fi
+    done | while read f; do
+      [[ ! "$f" =~ ^"$installdir"/ ]] || echo "$f"
+      spin
+    done
+  )"
+done
+spinend "done"
+for f in "${manifest[@]}"; do echo "$f"; done | sort >"$manifestfile"
+tell "  Wrote to $manifestfile"
+
+tell "Done!"

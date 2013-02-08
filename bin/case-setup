@@ -1,0 +1,21 @@
+#!/bin/bash -e
+source "$(dirname "$0")"/../lib/init
+set -o pipefail
+
+check_macosx
+check_noinstalldir
+
+which gcc >&/dev/null || {
+  tell "You must install the command line build tools."
+  tell "Please visit https://developer.apple.com/downloads"
+  exit 1
+}
+
+check_xquartz
+
+tell "Install homebrew files to $installdir"
+create_installdir
+curl -L https://github.com/mxcl/homebrew/tarball/master | tar xz --strip 1 -C "$installdir" || {
+  tell "Could not install Homebrew files to $installdir; aborting."; exit 1; }
+
+tell "You should now be set up to build."

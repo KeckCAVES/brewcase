@@ -1,0 +1,13 @@
+#!/bin/bash -e
+source "$(dirname "$0")"/../lib/init
+
+echo "#"
+echo "# Template /etc/rsyncd.conf file to serve up binaries built by brewcase."
+echo "#"
+for x in 6 7 8; do
+  macosxver=10.$x
+  loadcfg
+  echo "[${rsyncsrc#*::}]"
+  echo "  path = /path/to/$macosxver/root/./"
+  echo "  comment = $desc Binaries for Mac OS X $macosxver"
+done

@@ -1,0 +1,47 @@
+#!/bin/bash
+# 
+# To invoke remotely: bash -c "$(curl -fsSkL http://path/to/this/script)"
+#
+%init tell check_macosx check_xquartz check_noinstalldir create_installdir ask
+
+trap tell EXIT
+tell
+tell "Welcome to the $desc installer."
+tell "For more information, please see $url"
+tell
+
+check_macosx
+
+rsync "$rsyncsrc/$installdir/" >/dev/null || {
+  err=$?
+  tell "Cannot access software repository."
+  (($err==23)) && tell "Repository seems not to exist; perhaps this platform is not supported?"
+  exit $err
+}
+
+check_xquartz
+check_noinstalldir
+
+[[ $(groups) =~ (^| )admin( |$) ]] || { tell "You must be an administrator to install."; exit 1; }
+
+ask "Install to $installdir?" || { tell "Exiting."; exit 1; }
+
+create_installdir
+rsync -avP "$rsyncsrc/$installdir/" "$installdir" || { tell "Sync failed; aborting."; exit 1; }
+
+tell "Installation successful."
+tell "Commands are in $bindir"
+if (ask "Do you wish to add them to the global command search path?"); then
+  pathsdfile=/etc/paths.d/45-$name
+  sudo bash -c "echo $bindir >$pathsdfile"
+  tell "Installed path to $pathsdfile"
+  tell "Please open a new shell for it to take effect."
+else
+  if [[ "$PATH" =~ (^|:)"$bindir"(:|$) ]]; then
+    tell "$bindir seems to already be in your command search path."
+  else
+    tell "You will need to run commands directly from $bindir"
+  fi
+fi
+tell
+tell "Installation complete!"

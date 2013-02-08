@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# Update the installation.
+#
+%init ask tell
+
+trap tell EXIT
+tell
+
+[[ ! -e "$brew" ]] || {
+  tell "This appears to be a builder instance;"
+  tell "this command should only be run from an installation."; exit 1; }
+
+tell "Update $desc"
+tell
+
+if (( $(stat -f %u "$installdir") != $UID )); then
+  tell "To update, you should own the install directory $installdir"
+  tell "It is currently owned by "$(stat -f %Su "$installdir").
+  ask "Change ownership of $installdir?" || { echo "Exiting."; exit 1; }
+  sudo chown $UID "$installdir" || { tell "Ownership change failed; aborting."; exit 1; }
+fi
+
+rsync -avP --delete-after --delay-updates --partial-dir=.update-partial "$rsyncsrc/$installdir/" "$installdir" || {
+  tell "Update failed."; exit 1; }
+tell "Updated succeeded!"
