@@ -11,7 +11,7 @@ url="http://keckcaves.org/software"
 rsyncsrc=keckcaves.org::macosx$macosxver
 
 # Taps needed to build
-taps=(KeckCAVES/vrui)
+taps=(KeckCAVES/keckcaves)
 
 # The formulae to build
 formulae=(crusta lidarviewer nck visualizer vrui-examples)
