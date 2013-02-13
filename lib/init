@@ -60,7 +60,7 @@ check_xquartz() {
 check_init() {
   if [[ ! -x "$brew" ]]; then
     tell "It doesn't look like the build directory has been initialized."
-    tell "Please try to run case-init."
+    tell "Please try to run case-setup."
     exit 1
   fi
 }

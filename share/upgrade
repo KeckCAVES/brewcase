@@ -1,21 +1,48 @@
 #!/bin/bash
 #
-# Upgrade the installation.
+# Install or upgrade the software.
+# To invoke remotely:
+#   bash -c "$(curl -fsSkL example.org/path/to/this/script)"
 #
-%init ask tell spinstart spin spinend
+%init check_macosx check_xquartz check_noinstalldir create_installdir ask tell spinstart spin spinend
 
 trap tell EXIT
 set -o pipefail
-tell
 
-checkpath=''; [[ "$1" == "--checkpath" ]] && checkpath='y' && shift
+unset initinstall checkpath skipself
+[[ "$0" == "bash" ]] && initinstall='y'
+[[ "$1" == "--skipself" ]] && { skipself='y'; shift; }
+[[ "$1" == "--checkpath" ]] && checkpath='y'
+
+check_macosx
+check_xquartz
+rsync "$rsyncsrc/$installdir/" >/dev/null || {
+  err=$?
+  tell "Cannot access software repository."
+  (($err==23)) && tell "Repository seems not to exist; perhaps this platform is not supported?"
+  exit $err
+}
+
+if [[ -n "$initinstall" ]]; then
+  tell
+  tell "Welcome to the $desc installer."
+  tell "For more information, please see $url"
+  tell
+  check_noinstalldir
+  checkpath='y'
+  [[ $(groups) =~ (^| )admin( |$) ]] || { tell "You must be an administrator to install."; exit 1; }
+  tell "This script will create and install into $installdir"
+  ask "Proceed?" || { tell "Exiting with no filesystem changes."; exit 1; }
+  create_installdir
+elif [[ -z "$skipself" ]]; then
+  rsync -aR "$rsyncsrc/$installdir/./${upgrade#$installdir}" "$installdir" || {
+    tell "Upgrader upgrade failed; aborting."; exit 1; }
+  exec "$upgrade" "--skipself" "$@"
+fi
 
 [[ ! -e "$brew" ]] || {
   tell "This appears to be a builder instance;"
   tell "this command should only be run from an installation."; exit 1; }
-
-tell "Upgrade $desc"
-tell
 
 if (( $(stat -f %u "$installdir") != $UID )); then
   tell "To upgrade, you should own the install directory $installdir"
@@ -24,22 +51,22 @@ if (( $(stat -f %u "$installdir") != $UID )); then
   sudo chown $UID "$installdir" || { tell "Ownership change failed; aborting."; exit 1; }
 fi
 
-spinstart "Upgrading program files..."
+spinstart "Downloading program files..."
 for e in "${cfgfiles[@]}"; do echo "$e"; done |
   rsync -iazy --delete \
     --exclude-from=- --exclude="${cfgdbdir#$installdir}/" \
     "$rsyncsrc/$installdir/" "$installdir" 2>&1 | while read x; do spin; done || {
-      tell "Program file upgrade failed.  Installation may be in an usuable state!"; exit 1; }
+      tell "Program file download failed.  Installation may be in an usuable state!"; exit 1; }
 spinend
 
-spinstart "Upgrading configuration files..."
+spinstart "Downloading configuration files..."
 mkdir -p "$cfgdbdir"
 for e in "${cfgfiles[@]}"; do echo "$e"; done |
   rsync -iam --delete \
     --include-from=- --include='*/' --exclude='*' \
     --backup --suffix="$cfgorigsuffix" \
     "$rsyncsrc/$installdir/" "$cfgdbdir" 2>&1 | while read x; do spin; done || {
-      tell "Configuration file upgrade failed.  Installation may be in an usuable state!"; exit 1; }
+      tell "Configuration file download failed.  Installation may be in an usuable state!"; exit 1; }
 spinend
 find "$cfgdbdir" \! -type d \! -name '*'"$cfgorigsuffix" | while read f; do
   bf=${f#$cfgdbdir}
@@ -86,4 +113,4 @@ if [[ -n "$checkpath" ]]; then
   fi
 fi
 
-tell "Upgrade succeeded!"
+[[ -n "$initinstall" ]] && tell "Install succeeded!" || tell "Upgrade succeeded!"
