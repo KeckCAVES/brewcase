@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# Upgrade the installation.
+#
+%init ask tell spinstart spin spinend
+
+trap tell EXIT
+set -o pipefail
+tell
+
+checkpath=''; [[ "$1" == "--checkpath" ]] && checkpath='y' && shift
+
+[[ ! -e "$brew" ]] || {
+  tell "This appears to be a builder instance;"
+  tell "this command should only be run from an installation."; exit 1; }
+
+tell "Upgrade $desc"
+tell
+
+if (( $(stat -f %u "$installdir") != $UID )); then
+  tell "To upgrade, you should own the install directory $installdir"
+  tell "It is currently owned by "$(stat -f %Su "$installdir").
+  ask "Change ownership of $installdir?" || { echo "Exiting."; exit 1; }
+  sudo chown $UID "$installdir" || { tell "Ownership change failed; aborting."; exit 1; }
+fi
+
+spinstart "Upgrading program files..."
+for e in "${cfgfiles[@]}"; do echo "$e"; done |
+  rsync -iazy --delete \
+    --exclude-from=- --exclude="${cfgdbdir#$installdir}/" \
+    "$rsyncsrc/$installdir/" "$installdir" 2>&1 | while read x; do spin; done || {
+      tell "Program file upgrade failed.  Installation may be in an usuable state!"; exit 1; }
+spinend
+
+spinstart "Upgrading configuration files..."
+mkdir -p "$cfgdbdir"
+for e in "${cfgfiles[@]}"; do echo "$e"; done |
+  rsync -iam --delete \
+    --include-from=- --include='*/' --exclude='*' \
+    --backup --suffix="$cfgorigsuffix" \
+    "$rsyncsrc/$installdir/" "$cfgdbdir" 2>&1 | while read x; do spin; done || {
+      tell "Configuration file upgrade failed.  Installation may be in an usuable state!"; exit 1; }
+spinend
+find "$cfgdbdir" \! -type d \! -name '*'"$cfgorigsuffix" | while read f; do
+  bf=${f#$cfgdbdir}
+  of=$f$cfgorigsuffix
+  cf=$installdir$bf
+  cof=$installdir$bf$cfgorigsuffix
+  if [[ -e "$of" ]]; then
+    if (diff -s "$cf" "$of" >&/dev/null); then
+      cp -af "$f" "$cf" && tell "  Upgraded $cf"
+    else
+      cp -af "$f" "$cf$cfgnewsuffix"
+      [[ -e "$cof" ]] || cp -af "$of" "$cof"
+    fi
+    rm -f "$of"
+  else
+    [[ -e "$cf" ]] || { rsync -aR "$cfgdbdir/.$bf" "$installdir" && tell "  Generated $cf"; }
+  fi
+done
+find "$cfgdbdir" \! -type d -name '*'"$cfgorigsuffix" | while read of; do
+  f=${of%$cfgorigsuffix}
+  cf=$installdir${f#$cfgdbdir}
+  [[ -e "$cf" ]] && { mv -f "$cf" "$cf$cfgoldsuffix" && tell "  Moving aside removed $cf"; }
+  rm -f "$of"
+done
+find "$installdir" \! -type d -name '*'"$cfgnewsuffix" | while read nf; do
+  tell "  ${nf%$cfgnewsuffix} needs manual upgrading."
+done
+tell
+
+if [[ -n "$checkpath" ]]; then
+  tell "Commands are in $bindir"
+  globalpath=$(PATH="" /bin/bash -c '. /etc/profile && echo $PATH')
+  if ! [[ "$globalpath" =~ (^|:)"$bindir"(:|$) ]]; then
+    if (ask "Do you wish to add them to the global command search path?"); then
+      pathsdfile=/etc/paths.d/45-$name
+      sudo bash -c "echo $bindir >$pathsdfile"
+      tell "Installed path to $pathsdfile"
+      tell "Please open a new shell for it to take effect."
+    else
+      tell "You will need to run commands directly from $bindir"
+    fi
+  else
+    tell "This seems to already been in the global command search path."
+  fi
+fi
+
+tell "Upgrade succeeded!"

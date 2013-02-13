@@ -17,7 +17,12 @@ init() {
   installdir=/opt/$name
   bindir=$installdir/bin
   brew=$bindir/brew
+  upgrade=$bindir/$name-upgrade
   manifestfile=$installdir/MANIFEST
+  cfgdbdir=$installdir/var/lib/brewcase-$name/cfgdb
+  cfgoldsuffix=.$name-old
+  cfgnewsuffix=.$name-new
+  cfgorigsuffix=.$name-orig
 }
 
 brew() {
@@ -33,7 +38,12 @@ check_macosx() {
 
 check_noinstalldir() {
   if [[ -e "$installdir" ]]; then
-    tell "Found $installdir; perhaps a builder installation already exists?"
+    tell "Found $installdir"
+    if [[ -e "$brew" ]]; then
+      tell "It looks to be a builder instance.  To upgrade it, run case-build."
+    elif [[ -x "$upgrade" ]]; then
+      tell "To upgrade, please run $upgrade"
+    fi
     tell "To start from scratch, please move or remove $installdir"
     exit 1
   fi
@@ -88,7 +98,8 @@ spin() {
 }
 
 spinend() {
-  printf "\b$@\n" >/dev/stderr
+  s="$@"
+  printf "\b${s:- }\n" >/dev/stderr
 }
 
 ask() {

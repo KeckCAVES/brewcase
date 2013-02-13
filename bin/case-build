@@ -3,44 +3,47 @@ source "$(dirname "$0")"/../lib/init
 
 check_init
 
-[[ -x "$bindir/git" ]] || { tell "Still need git; installing..."; brew install git; }
+nobrew=''; [[ "$1" == "--nobrew" ]] && nobrew='y' && shift
 
-tell "Tapping..."
-tapswant=$(for x in "${taps[@]}"; do echo $x; done)
-tapshave=$(brew tap)
-[[ -n "$tapshave" ]] && echo "$tapshave" | while read t; do
-  echo "$tapswant" | grep -m 1 -i ^$t\$ >&/dev/null || brew untap $t
-done
-[[ -n "$tapswant" ]] && echo "$tapswant" | while read t; do
-  echo "$tapshave" | grep -m 1 -i ^$t\$ >&/dev/null || brew tap $t
-done
-brew tap --repair
+if [[ -z "$nobrew" ]]; then
+  [[ -x "$bindir/git" ]] || { tell "Still need git; installing..."; brew install git; }
 
-tell "Updating..."
-brew update
+  tell "Tapping..."
+  tapswant=$(for x in "${taps[@]}"; do echo $x; done)
+  tapshave=$(brew tap)
+  [[ -n "$tapshave" ]] && echo "$tapshave" | while read t; do
+    echo "$tapswant" | grep -m 1 -i ^$t\$ >&/dev/null || brew untap $t
+  done
+  [[ -n "$tapswant" ]] && echo "$tapswant" | while read t; do
+    echo "$tapshave" | grep -m 1 -i ^$t\$ >&/dev/null || brew tap $t
+  done
+  brew tap --repair
 
-tell "Uninstalling unneeded formula..."
-allreqs=$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
-brew ls | while read f; do
-  echo "$allreqs" | grep -m 1 "^\(.*/\)\?$f"\$ >&/dev/null || brew remove --force $f
-done
+  tell "Updating..."
+  brew update
 
-tell "Upgrading..."
-brew upgrade
+  tell "Uninstalling unneeded formula..."
+  allreqs=$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
+  brew ls | while read f; do
+    echo "$allreqs" | grep -m 1 "^\(.*/\)\?$f"\$ >&/dev/null || brew remove --force $f
+  done
 
-tell "Installing..."
-allreqs=(); while read x; do allreqs+=($x); done <<<$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
-for f in ${allreqs[@]}; do
-  brew ls | grep -m 1 ^${f##*/}\$ >&/dev/null || brew install --fresh $f
-done
+  tell "Upgrading..."
+  brew upgrade
 
-tell "Cleaning up..."
-brew cleanup
+  tell "Installing..."
+  allreqs=(); while read x; do allreqs+=($x); done <<<$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
+  for f in ${allreqs[@]}; do
+    brew ls | grep -m 1 ^${f##*/}\$ >&/dev/null || brew install --fresh $f
+  done
 
-tell "Generating update command..."
-update="$bindir/$name-update"
-mkscript update >"$update"
-chmod +x "$update"
+  tell "Cleaning up..."
+  brew cleanup
+fi
+
+tell "Generating upgrade command..."
+mkscript upgrade >"$upgrade"
+chmod +x "$upgrade"
 
 tell "Generating manifest..."
 tell "  Get dependencies of"
@@ -55,7 +58,7 @@ while read x; do [[ -n "$x" ]] && manifest+=("$x"); done<<<"$(
       tell "    $x [Not found]"
     fi
     done | sort -u
-  echo "$update"
+  echo "$upgrade"
 )"
 spinstart "  Scanning..."
 for ((n=0; n<${#manifest[@]}; ++n)); do
