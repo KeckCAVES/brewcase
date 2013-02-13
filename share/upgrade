@@ -6,7 +6,6 @@
 #
 %init check_macosx check_xquartz check_noinstalldir create_installdir ask tell spinstart spin spinend
 
-trap tell EXIT
 set -o pipefail
 
 unset initinstall checkpath skipself
@@ -16,12 +15,16 @@ unset initinstall checkpath skipself
 
 check_macosx
 check_xquartz
+[[ ! -e "$brew" ]] || {
+  tell "This appears to be a builder instance;"
+  tell "this command should only be run from an installation."; exit 1; }
 rsync "$rsyncsrc/$installdir/" >/dev/null || {
   err=$?
   tell "Cannot access software repository."
   (($err==23)) && tell "Repository seems not to exist; perhaps this platform is not supported?"
   exit $err
 }
+trap tell EXIT
 
 if [[ -n "$initinstall" ]]; then
   tell
@@ -35,14 +38,11 @@ if [[ -n "$initinstall" ]]; then
   ask "Proceed?" || { tell "Exiting with no filesystem changes."; exit 1; }
   create_installdir
 elif [[ -z "$skipself" ]]; then
+  tell
   rsync -aR "$rsyncsrc/$installdir/./${upgrade#$installdir}" "$installdir" || {
     tell "Upgrader upgrade failed; aborting."; exit 1; }
   exec "$upgrade" "--skipself" "$@"
 fi
-
-[[ ! -e "$brew" ]] || {
-  tell "This appears to be a builder instance;"
-  tell "this command should only be run from an installation."; exit 1; }
 
 if (( $(stat -f %u "$installdir") != $UID )); then
   tell "To upgrade, you should own the install directory $installdir"
@@ -113,4 +113,12 @@ if [[ -n "$checkpath" ]]; then
   fi
 fi
 
-[[ -n "$initinstall" ]] && tell "Install succeeded!" || tell "Upgrade succeeded!"
+if [[ -n "$initinstall" ]]; then
+  tell
+  tell "Install succeeded!"
+  tell
+  tell "Note: If you've never launched XQuartz before, you may need to launch it"
+  tell "      manually first before you are able to launch other software."
+else
+  tell "Upgrade succeeded!"
+fi
