@@ -10,6 +10,9 @@ url="http://keckcaves.org/software"
 # URL for users to rsync from for installation and updates
 rsyncsrc=keckcaves.org::macosx$macosxver
 
+# Default location for export
+exportdest="keckcaves.org:/srv/keckcaves.org/www/releases/macosx/$macosxver"
+
 # Taps needed to build
 taps=(KeckCAVES/keckcaves)
 
