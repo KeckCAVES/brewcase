@@ -51,23 +51,32 @@ if (( $(stat -f %u "$installdir") != $UID )); then
   sudo chown $UID "$installdir" || { tell "Ownership change failed; aborting."; exit 1; }
 fi
 
+dlcnt=0
 spinstart "Downloading program files..."
 for e in "${cfgfiles[@]}"; do echo "$e"; done |
-  rsync -iazy --delete \
-    --exclude-from=- --exclude="${cfgdbdir#$installdir}/" \
-    "$rsyncsrc/$installdir/" "$installdir" 2>&1 | while read x; do spin; done || {
-      tell "Program file download failed.  Installation may be in an usuable state!"; exit 1; }
-spinend
+rsync -iazy --delete --exclude-from=- --exclude="${cfgdbdir#$installdir}/" "$rsyncsrc/$installdir/" "$installdir" 2>&1 | {
+  while read x; do spin; ((++dlcnt)); done
+  spinend "got $dlcnt."
+} || {
+  spinend "X"
+  tell "Program file download failed."
+  tell "Installation may be in an unusable state!"
+  exit 1
+}
 
 spinstart "Downloading configuration files..."
 mkdir -p "$cfgdbdir"
 for e in "${cfgfiles[@]}"; do echo "$e"; done |
-  rsync -iam --delete \
-    --include-from=- --include='*/' --exclude='*' \
-    --backup --suffix="$cfgorigsuffix" \
-    "$rsyncsrc/$installdir/" "$cfgdbdir" 2>&1 | while read x; do spin; done || {
-      tell "Configuration file download failed.  Installation may be in an usuable state!"; exit 1; }
-spinend
+rsync -iam --delete --include-from=- --include='*/' --exclude='*' --backup --suffix="$cfgorigsuffix" "$rsyncsrc/$installdir/" "$cfgdbdir" 2>&1 | {
+  while read x; do spin; ((++dlcnt)); done
+  spinend "got $dlcnt."
+} || {
+  spinend "X"
+  tell "Configuration file download failed."
+  tell "Installation may be in an unusable state!"
+  exit 1
+}
+
 find "$cfgdbdir" \! -type d \! -name '*'"$cfgorigsuffix" | while read f; do
   bf=${f#$cfgdbdir}
   of=$f$cfgorigsuffix
@@ -115,10 +124,10 @@ fi
 
 if [[ -n "$initinstall" ]]; then
   tell
-  tell "Install succeeded!"
+  tell "Install complete."
   tell
   tell "Note: If you've never launched XQuartz before, you may need to launch it"
   tell "      manually first before you are able to launch other software."
 else
-  tell "Upgrade succeeded!"
+  tell "Upgrade complete."
 fi
