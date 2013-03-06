@@ -45,6 +45,9 @@ tell "Generating upgrade command..."
 mkscript upgrade >"$upgrade"
 chmod +x "$upgrade"
 
+tell "Fixing permissions..."
+find "$installdir" -perm +u+w,g-w -exec chmod g+w '{}' \+
+
 tell "Generating manifest..."
 tell "  Get dependencies of"
 manifest=()
