@@ -23,7 +23,7 @@ if [[ -z "$nobrew" ]]; then
   brew update
 
   tell "Uninstalling unneeded formula..."
-  allreqs=$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
+  allreqs=$(for f in "${formulae[@]}"; do f=${f%% *}; echo $f; brew deps $f; done)
   brew ls | while read f; do
     echo "$allreqs" | grep -m 1 "^\(.*/\)\?$f"\$ >&/dev/null || brew remove --force $f
   done
@@ -32,9 +32,10 @@ if [[ -z "$nobrew" ]]; then
   brew upgrade
 
   tell "Installing..."
-  allreqs=(); while read x; do allreqs+=($x); done <<<$(for f in "${formulae[@]}"; do echo $f; brew deps $f; done)
+  allreqs=(); while read x; do allreqs+=($x); done <<<$(for f in "${formulae[@]}"; do echo $f; brew deps ${f%% *}; done)
   for f in ${allreqs[@]}; do
-    brew ls | grep -m 1 ^${f##*/}\$ >&/dev/null || brew install --fresh $f
+    f=${f##*/}; name=${f%% *}
+    brew ls | grep -m 1 ^$name\$ >&/dev/null || (IFS=" "; brew install --fresh $f)
   done
 
   tell "Cleaning up..."
