@@ -17,14 +17,12 @@ exportdest="keckcaves.org:/srv/keckcaves.org/www/releases/macosx/$macosxver"
 taps=(KeckCAVES/keckcaves)
 
 # The formulae to build
-formulae=(crusta lidarviewer nck visualizer vrui-examples)
+formulae=("gdal --without-python" crusta lidarviewer nck visualizer vrui-examples)
 
 # The files required in the rsync module
 # Additional files will be pulled in as required by the ones listed here.
 # Formatted as bash pathname expansions rooted in installation directory.
-pkgfiles=(bin/crusta* bin/construo bin/LidarViewer bin/NanotechConstructionKit bin/3DVisualizer bin/ShowEarthModel
-  lib/libproj.dylib # Needed by gdal, but not picked up by scan
-)
+pkgfiles=(bin/crusta* bin/construo bin/LidarViewer bin/NanotechConstructionKit bin/3DVisualizer bin/ShowEarthModel)
 
 # Configuration files to track and not automatically overwrite between updates.
 # Formatted as rsync include/exclude rules rooted in installation directory.
